@@ -2,6 +2,7 @@
 [Review] Multi-Agent Actor-Critic for Mixed Cooperative-Competitive Environment 
 
 > 참고 
+> http://www.modulabs.co.kr/DeepLAB_Paper/15445
 > https://jay.tech.blog/2018/08/04/multi-agent-actor-critic-rl/
 > 의역과 오역은 언제든지 메일로 조언해주세요
 > OpenAI 의 코드는 Fork 한 목록에서 확인해주세요.
