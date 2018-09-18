@@ -73,6 +73,9 @@ online fashion 방법으로 Q function을 위의 수식을 따라 업데이트 �
 
 ![image](https://user-images.githubusercontent.com/40893452/45660205-95c0ce80-bb32-11e8-9d93-6b0018b4417c.png)
 
+> ![image](https://user-images.githubusercontent.com/40893452/45660415-9efe6b00-bb33-11e8-9db8-ec26f788266d.png)
+
+
 ### [Algorithm]
 ![image](https://user-images.githubusercontent.com/40893452/45660259-d9b3d380-bb32-11e8-890a-d0861ce26f50.png)
 
