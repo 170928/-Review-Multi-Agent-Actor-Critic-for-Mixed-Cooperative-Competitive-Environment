@@ -3,9 +3,45 @@ import tensorflow as tf
 import random
 import tensorflow.layers as layer
 from collections import deque
+import random
+import datetime
+import time
+from multiagent.environment import MultiAgentEnv
+from multiagent.policy import InteractivePolicy
+import multiagent.scenarios as scenarios
+
+########################################
+load_model = False
+train_mode = True
+
+batch_size = 32
+mem_maxlen = 50000
+discount_factor = 0.99
+learning_rate = 0.00025
+
+run_episode = 10000
+start_train_episode = 500
+target_update_step = 5000
+
+print_interval = 100
+save_interval = 1000
+
+epsilon_min = 0.1
+
+date_time = str(datetime.date.today()) + '_' + \
+            str(datetime.datetime.now().hour) + '_' + \
+            str(datetime.datetime.now().minute) + '_' + \
+            str(datetime.datetime.now().second)
+
+env_name = "../envs/Socoban"
+save_path = "saved_models/"+date_time+"_dqn"
+load_path = ""
+
+numGoals = 3
+###########################################
 
 class Critic(object):
-    def __init__(self, state_size, action_size,  model_name="model"):
+    def __init__(self, state_size, action_size,  model_name="Qmodel"):
 
         # state_size is [1 x state_dim * agent_num]
         self.state_size = state_size
@@ -24,7 +60,7 @@ class Critic(object):
         self.q_predict = self.Q_Out
 
 class Actor(object):
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, model_name="Pimodel"):
 
         # state_size = state_dim
         self.state_size = state_size
@@ -42,10 +78,9 @@ class Actor(object):
 
         self.pi_predict = self.Pi_Out
 
-
 class MADDPGAgent(object):
     def __init__(self, agent_num, state_dim, action_dim, learning_rate=0.00025):
-        # (1) “actor” : agent in reinforcement learning
+        # (1) "actor" : agent in reinforcement learning
         # (2) "critic" : helps the actor decide what actions to reinforce during training.
         # Traditionally, the critic tries to predict the value (i.e. the reward we expect to get in the future) of an action in a particular state s(t)
         # predicted value from critic is used to update the actor policy
