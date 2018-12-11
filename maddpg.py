@@ -86,7 +86,7 @@ class Actor(object):
         self.pi_predict = self.Pi_Out
 
 class MADDPGAgent(object):
-    def __init__(self, agent_num, state_size_n, action_size, learning_rate=0.00025, batch_size = 32):
+    def __init__(self, agent_num, state_size_n, action_size, learning_rate=0.00025, batch_size = 32, run_episode=10000, epsilon=1.0, epsilon_min=0.1, discount_factor=0.99):
         # (1) "actor" : agent in reinforcement learning
         # (2) "critic" : helps the actor decide what actions to reinforce during training.
         # Traditionally, the critic tries to predict the value (i.e. the reward we expect to get in the future) of an action in a particular state s(t)
@@ -108,9 +108,6 @@ class MADDPGAgent(object):
         self.memory = deque(maxlen=mem_maxlen)
         self.batch_size = batch_size
 
-
-
-
         # Save & Load ###########################################
         self.Saver = tf.train.Saver(max_to_keep=5)
         self.save_path = save_path
@@ -124,7 +121,59 @@ class MADDPGAgent(object):
         self.sess.run(self.init)
         #########################################################
 
+        # Update Parameters ####################################
+        self.epsilon = epsilon
+        self.epsilon_min = epsilon_min
+        self.discount_factor = discount_factor
+        self.run_episode = run_episode
+        #########################################################
 
+
+    # 수정 안함 =====================================================================================================================
+    def train_model(self, done):
+        if done:
+            if self.epsilon > self.epsilon_min:
+                self.epsilon -= 1/self.run_episode
+
+        mini_batch = random.sample(self.memory, self.batch_size)
+
+        states = []
+        actions = []
+        rewards = []
+        next_states = []
+        dones = []
+
+        for i in range(self.batch_size):
+            states.append(mini_batch[i][0])
+            actions.append(mini_batch[i][1])
+            rewards.append(mini_batch[i][2])
+            next_states.append(mini_batch[i][3])
+            dones.append(mini_batch[i][4])
+
+        target = self.sess.run(self.model.Q_Out,feed_dict={self.model.input:states})
+        target_val = self.sess.run(self.target_model.Q_Out,feed_dict={self.target_model.input:next_states})
+
+        for i in range(self.batch_size):
+            if dones[i]:
+                target[i][actions[i]] = rewards[i]
+            else:
+                target[i][actions[i]] = rewards[i] + self.discount_factor*np.amax(target_val[i])
+
+        _,loss = self.sess.run([self.model.UpdateModel,self.model.loss],feed_dict={self.model.input:states,self.model.target_Q:target})
+        return loss
+
+    def update_target(self):
+        trainable_variables = tf.trainable_variables()
+        trainable_variables_network = [var for var in trainable_variables if var.name.startswith('Q')]
+        trainable_variables_target = [var for var in trainable_variables if var.name.startswith('target')]
+
+        for i in range(len(trainable_variables_network)):
+            self.sess.run(tf.assign(trainable_variables_target[i], trainable_variables_network[i]))
+    # 수정 안함 =====================================================================================================================
+
+
+
+    
     def append_sample(self,state, action_n, reward, next_state, done):
         self.memory.append((state[0], action_n, reward, next_state[0], done))
 
@@ -140,8 +189,6 @@ class MADDPGAgent(object):
 
     def Write_Summray(self,reward,loss,episode):
         self.Summary.add_summary(self.sess.run(self.Merge,feed_dict={self.summary_loss:loss,self.summary_reward:reward}),episode)
-
-
 
 
 if __name__=="__main__":

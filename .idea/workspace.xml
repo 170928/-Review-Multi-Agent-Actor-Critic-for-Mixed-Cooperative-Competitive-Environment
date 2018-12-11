@@ -2,7 +2,6 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="9923c0d5-3129-4436-9c36-2720c08eb341" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/maddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/maddpg.py" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
@@ -16,8 +15,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/maddpg.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="-154">
-              <caret line="109" lean-forward="true" selection-start-line="109" selection-end-line="109" />
+            <state relative-caret-position="853">
+              <caret line="175" column="4" selection-start-line="175" selection-start-column="4" selection-end-line="175" selection-end-column="4" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -37,8 +36,8 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Socoban_DQN_TF_Kyushik.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="602">
-              <caret line="72" lean-forward="true" selection-start-line="72" selection-end-line="76" selection-end-column="84" />
+            <state relative-caret-position="307">
+              <caret line="80" column="146" selection-start-line="80" selection-start-column="128" selection-end-line="80" selection-end-column="146" />
               <folding>
                 <element signature="e#0#31#0" expanded="true" />
               </folding>
@@ -188,8 +187,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/Socoban_DQN_TF_Kyushik.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="602">
-          <caret line="72" lean-forward="true" selection-start-line="72" selection-end-line="76" selection-end-column="84" />
+        <state relative-caret-position="307">
+          <caret line="80" column="146" selection-start-line="80" selection-start-column="128" selection-end-line="80" selection-end-column="146" />
           <folding>
             <element signature="e#0#31#0" expanded="true" />
           </folding>
@@ -198,8 +197,8 @@
     </entry>
     <entry file="file://$PROJECT_DIR$/maddpg.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="-154">
-          <caret line="109" lean-forward="true" selection-start-line="109" selection-end-line="109" />
+        <state relative-caret-position="853">
+          <caret line="175" column="4" selection-start-line="175" selection-start-column="4" selection-end-line="175" selection-end-column="4" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>
