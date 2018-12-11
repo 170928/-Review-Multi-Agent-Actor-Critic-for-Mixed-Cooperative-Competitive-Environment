@@ -10,7 +10,10 @@ from multiagent.environment import MultiAgentEnv
 from multiagent.policy import InteractivePolicy
 import multiagent.scenarios as scenarios
 
+
 ########################################
+action_size = 5
+
 load_model = False
 train_mode = True
 
@@ -59,6 +62,10 @@ class Critic(object):
 
         self.q_predict = self.Q_Out
 
+        self.target_Q = tf.placeholder(shape=[None],dtype=tf.float32)
+        self.loss = tf.losses.mean_squared_error(self.target_Q, self.q_predict)
+        self.UpdateModel = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
+
 class Actor(object):
     def __init__(self, state_size, action_size, model_name="Pimodel"):
 
@@ -79,7 +86,7 @@ class Actor(object):
         self.pi_predict = self.Pi_Out
 
 class MADDPGAgent(object):
-    def __init__(self, agent_num, state_dim, action_dim, learning_rate=0.00025):
+    def __init__(self, agent_num, state_size_n, action_size, learning_rate=0.00025, batch_size = 32):
         # (1) "actor" : agent in reinforcement learning
         # (2) "critic" : helps the actor decide what actions to reinforce during training.
         # Traditionally, the critic tries to predict the value (i.e. the reward we expect to get in the future) of an action in a particular state s(t)
@@ -88,9 +95,19 @@ class MADDPGAgent(object):
         # variation of reward makes the update pertuative
         # In maddpg, we enhance our critics so they can access the observations and actions of all the agents,
 
-        self.state_size = state_dim
-        self.action_size = action_dim
+        # various state size can exist.
+        self.state_size_n = state_size_n
+        self.action_size = action_size
         self.agent_num = agent_num
+
+        self.actors = [Actor(self.state_size_n[i], self.action_size, str(i)+"Pimodel") for i in range(agent_num)]
+        self.critics = [Critic(self.state_size_n[i], self.action_size, str(i)+"Qmodel") for i in range(agent_num)]
+        self.target_actors = [Actor(self.state_size_n[i], self.action_size, str(i)+"targetPimodel") for i in range(agent_num)]
+        self.target_critics = [Critic(self.state_size_n[i], self.action_size, str(i)+"targetQmodel") for i in range(agent_num)]
+
+        self.memory = deque(maxlen=mem_maxlen)
+        self.batch_size = batch_size
+
 
 
 
@@ -106,6 +123,10 @@ class MADDPGAgent(object):
         self.init = tf.global_variables_initializer()
         self.sess.run(self.init)
         #########################################################
+
+
+    def append_sample(self,state, action_n, reward, next_state, done):
+        self.memory.append((state[0], action_n, reward, next_state[0], done))
 
     def save_model(self):
         self.Saver.save(self.sess,self.save_path + "\model.ckpt")
@@ -141,9 +162,9 @@ if __name__=="__main__":
     env.render()
     obs_n = env.reset()
     print("# of agent {}".format(env.n))
-    print("agent 1 is adversary // agent 2 & 3 are cooperative")
-    print("observation dim : {}, action dim : {}".format(env.observation_space, env.action_space))
-
+    obs_shape_n = [env.observation_space[i].shape for i in range(env.n)]
+    print("observation dim : {}".format(obs_shape_n))
+    print("action dim : {}".format(action_size))
 
 
     #while True:
