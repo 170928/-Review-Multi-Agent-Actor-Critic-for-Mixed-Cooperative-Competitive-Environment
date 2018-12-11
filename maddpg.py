@@ -33,8 +33,8 @@ date_time = str(datetime.date.today()) + '_' + \
             str(datetime.datetime.now().minute) + '_' + \
             str(datetime.datetime.now().second)
 
-env_name = "../envs/Socoban"
-save_path = "saved_models/"+date_time+"_dqn"
+env_name = "simple_adverary.py"
+save_path = "./saved_models/"+date_time+"_maddpg"
 load_path = ""
 
 numGoals = 3
@@ -70,7 +70,7 @@ class Actor(object):
         self.input = tf.placeholder(shape=[None, self.state_size],dtype=tf.float32)
 
         with tf.variable_scope(name_or_scope='PiNet'+model_name):
-            self.mlp1 = layer.dense(inputs=self.input, activation = tf.nn.relu)
+            self.mlp1 = layer.dense(inputs=self.input,activation = tf.nn.relu)
             self.mlp2 = layer.dense(inputs=self.mlp1, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, activation = tf.nn.relu)
@@ -92,12 +92,72 @@ class MADDPGAgent(object):
         self.action_size = action_dim
         self.agent_num = agent_num
 
-        
+
+
+        # Save & Load ###########################################
+        self.Saver = tf.train.Saver(max_to_keep=5)
+        self.save_path = save_path
+        self.load_path = load_path
+        self.Summary,self.Merge = self.make_Summary()
+        #########################################################
+
+        # Session Initialize ####################################
+        self.sess = tf.Session()
+        self.init = tf.global_variables_initializer()
+        self.sess.run(self.init)
+        #########################################################
+
+    def save_model(self):
+        self.Saver.save(self.sess,self.save_path + "\model.ckpt")
+
+    def make_Summary(self):
+        self.summary_loss = tf.placeholder(dtype=tf.float32)
+        self.summary_reward = tf.placeholder(dtype=tf.float32)
+        tf.summary.scalar("loss", self.summary_loss)
+        tf.summary.scalar("reward",self.summary_reward)
+        return tf.summary.FileWriter(logdir=save_path,graph=self.sess.graph),tf.summary.merge_all()
+
+    def Write_Summray(self,reward,loss,episode):
+        self.Summary.add_summary(self.sess.run(self.Merge,feed_dict={self.summary_loss:loss,self.summary_reward:reward}),episode)
 
 
 
 
+if __name__=="__main__":
+    # Particle-environment
+    # https://github.com/openai/multiagent-particle-envs
+    # MADDPG
+    # https://github.com/xuehy/pytorch-maddpg/blob/master/MADDPG.py
 
+    print(tf.__version__)
+
+    # load scenario from script
+    scenario = scenarios.load('simple_adversary.py').Scenario()
+    # create world
+    world = scenario.make_world()
+    # create multiagent environment
+    env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, info_callback=None,
+                        shared_viewer=True)
+    env.render()
+    obs_n = env.reset()
+    print("# of agent {}".format(env.n))
+    print("agent 1 is adversary // agent 2 & 3 are cooperative")
+    print("observation dim : {}, action dim : {}".format(env.observation_space, env.action_space))
+
+
+
+    #while True:
+        # query for action from each agent's policy
+    #act_n = []
+    #for i, policy in enumerate(policies):
+    #    act_n.append(policy.action(obs_n[i]))
+        # step environment
+    #obs_n, reward_n, done_n, _ = env.step(act_n)
+        # render all agent views
+    #env.render()
+        # display rewards
+        # for agent in env.world.agents:
+        #    print(agent.name + " reward: %0.3f" % env._get_reward(agent))
 
 
 
