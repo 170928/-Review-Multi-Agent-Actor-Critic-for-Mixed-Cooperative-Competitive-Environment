@@ -148,6 +148,7 @@ class DQNAgent():
             next_states.append(mini_batch[i][3])
             dones.append(mini_batch[i][4])
 
+        # target 은 [batch_size x action_dim] 배열이 나옴.
         target = self.sess.run(self.model.Q_Out,feed_dict={self.model.input:states})
         target_val = self.sess.run(self.target_model.Q_Out,feed_dict={self.target_model.input:next_states})
 
