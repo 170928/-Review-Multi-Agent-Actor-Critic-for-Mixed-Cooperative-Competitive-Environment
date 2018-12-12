@@ -160,36 +160,50 @@ class MADDPGAgent(object):
             dones.append(mini_batch[i][4])
         # ============================================================================================================================
 
-        # next actions ========================
+        # [batch_size x agent_num]
+        states = np.array(states)
+        next_states = np.array(next_states)
+        actions = np.array(actions)
+        rewards = np.array(rewards)
+
+        start = 0
+        end = 0
         for i in range(self.agent_num):
-            next_actions.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input: next_states}))
-        # =====================================
+            end += self.state_size_n[i]
+            next_actions.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input: states[:,start:end]}))
+            start += self.state_size_n[i]
 
         # actions reshape =====================
-        actions = np.reshape(actions, newshape=[-1,self.agent_num * action_size])
-        next_actions = np.reshape(next_actions, newshape=[-1,self.agent_num * action_size])
+        next_actions = np.hstack(next_actions)
         # =====================================
-
         targets = []
         target_vals = []
+        start = 0
+        end = 0
         for i in range(self.agent_num):
-            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict={self.critics[i].input: states, self.critics[i].action_input: actions}))
-            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict={self.target_critics[i].input: next_states, self.target_critics[i].action_input: next_actions}))
+            end+=self.state_size_n[i]
+            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions}))
+            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict={self.target_critics[i].input: next_states[:,start:end], self.target_critics[i].action_input: next_actions}))
+            start+=self.state_size_n[i]
 
-        print(dones[0])
-        print(dones[0,0])
+        # [agent_num x batch_size]
+        targets = np.array(targets)
+        target_vals = np.array(target_vals)
 
-        '''
+        # calculate y^
         for i in range(self.batch_size):
-            if dones[i]:
-                target[i][actions[i]] = rewards[i]
-            else:
-                target[i][actions[i]] = rewards[i] + self.discount_factor*np.amax(target_val[i])
+            for j in range(self.agent_num):
+                if dones[i][j]:
+                    targets[j][i] = rewards[i][j]
+                else:
+                    targets[j][i] = rewards[i][j] + self.discount_factor*target_vals[j][i]
 
-        _,loss = self.sess.run([self.model.UpdateModel,self.model.loss],feed_dict={self.model.input:states,self.model.target_Q:target})
-        '''
+    # 수정 안함 =====================================================================================================================
+        # update Critic
+        _,loss = self.sess.run([self.model.UpdateModel,self.model.loss],feed_dict={self.model.input:states, self.model.target_Q:target})
 
-        loss = 1
+        # update Actor
+
         return loss
 
     def update_target(self):
@@ -204,7 +218,7 @@ class MADDPGAgent(object):
 
     # 모든 정보는 [ batch_size x # of agents ] 형태로 저장 된다
     def append_sample(self, state_n, action_n, reward_n, next_state_n, done_n):
-        self.memory.append((state_n[0], action_n, reward_n, next_state_n[0], done_n))
+        self.memory.append((state_n, action_n, reward_n, next_state_n, done_n))
 
     def save_model(self):
         self.Saver.save(self.sess,self.save_path + "\model.ckpt")
@@ -249,9 +263,7 @@ if __name__=="__main__":
     next_obs_n, reward_n, done_n, _ = env.step(acs_n)
 
     # good_agent # = 2,  adversary_agent # = 1
-
-
-    maddpg.append_sample(obs_n, acs_n, reward_n, next_obs_n, done_n)
-    maddpg.append_sample(obs_n, acs_n, reward_n, next_obs_n, done_n)
+    maddpg.append_sample(np.hstack(obs_n), np.hstack(acs_n), np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(np.hstack(obs_n), np.hstack(acs_n), np.hstack(reward_n), np.hstack(next_obs_n), done_n)
 
     maddpg.train_model(False)
