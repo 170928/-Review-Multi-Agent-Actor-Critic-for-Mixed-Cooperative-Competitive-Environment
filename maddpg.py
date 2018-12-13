@@ -49,16 +49,16 @@ class Critic(object):
 
         # state_size is [1 x state_dim * agent_num]
         self.state_size = state_size
-        # action_size is [1 x action_dim]
-        self.action_size = action_size
+        # action_size is [1 x action_dim * agent_num]
+        self.action_size = action_size * agent_num
 
         self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
         self.action_input = [tf.placeholder(shape=[None, self.action_size], dtype=tf.float32) for _ in range(agent_num)]
 
         with tf.variable_scope(name_or_scope=model_name):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
-            self.concat_action = tf.concat(self.action_input, axis = 1)
-            self.concat = tf.concat([self.mlp1, self.concat_action], axis = 1)
+            self.concat_action = tf.concat(self.action_input, axis=1)
+            self.concat = tf.concat([self.mlp1, self.concat_action], axis=1)
             self.mlp2 = layer.dense(inputs=self.concat, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
@@ -73,9 +73,9 @@ class Critic(object):
         self.action_grads = tf.gradients(self.q_predict, self.action_input)
 
 class Actor(object):
-    def __init__(self, state_size, action_size, model_name="Pimodel", agent_num = 3):
+    def __init__(self, state_size, action_size, model_name="Pimodel"):
 
-        self.agent_num = agent_num
+        self.agent_num = 3
         # state_size = state_dim
         self.state_size = state_size
         # action_size is action_dim
@@ -97,10 +97,10 @@ class Actor(object):
 
         trainable_variables = tf.trainable_variables()
         trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
-        self.action_gradients = tf.placeholder(tf.float32, [None, self.action_size])
-        self.actor_gradients = tf.gradients(self.pi_predict, trainable_variables_Actor, -self.action_gradients)
-        self.grads_and_vars = list(zip(self.actor_gradients, trainable_variables_Actor))
-        self.updateGradients = tf.train.AdamOptimizer(learning_rate).apply_gradients(self.grads_and_vars)
+        #self.action_gradients = tf.placeholder(tf.float32, [None, self.action_size * self.agent_num])
+        #self.actor_gradients = tf.gradients(self.pi_predict, trainable_variables_Actor, -self.action_gradients)
+        #self.grads_and_vars = list(zip(self.actor_gradients, trainable_variables_Actor))
+        #self.updateGradients = tf.train.AdamOptimizer(learning_rate).apply_gradients(self.grads_and_vars)
 
 
 class MADDPGAgent(object):
@@ -198,8 +198,16 @@ class MADDPGAgent(object):
         end = 0
         for i in range(self.agent_num):
             end+=self.state_size_n[i]
-            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions}))
-            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict={self.target_critics[i].input: next_states[:,start:end], self.target_critics[i].action_input: next_actions}))
+            feed_dict = {
+                self.critics[i].input: states[:, start:end],
+                self.critics[i].action_input: actions,
+            }
+            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict=feed_dict))
+            feed_dict = {
+                self.target_critics[i].input: next_states[:, start:end],
+                self.target_critics[i].action_input: next_actions
+            }
+            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict=feed_dict))
             start+=self.state_size_n[i]
 
         # [agent_num x batch_size]
@@ -226,7 +234,6 @@ class MADDPGAgent(object):
 
         # update Actor
         pi_n = self.get_actions(states)
-        print(pi_n)
         grads = self.action_gradients(states, pi_n)
         self.updateActor(states, grads)
 
