@@ -30,6 +30,7 @@ print_interval = 100
 save_interval = 1000
 
 epsilon_min = 0.1
+softlambda = 0.9
 
 date_time = str(datetime.date.today()) + '_' + \
             str(datetime.datetime.now().hour) + '_' + \
@@ -198,23 +199,46 @@ class MADDPGAgent(object):
                 else:
                     targets[j][i] = rewards[i][j] + self.discount_factor*target_vals[j][i]
 
-    # 수정 안함 =====================================================================================================================
         # update Critic
-        _,loss = self.sess.run([self.model.UpdateModel,self.model.loss],feed_dict={self.model.input:states, self.model.target_Q:target})
+        start = 0
+        end = 0
+        loss_n = []
+        for i in range(self.agent_num):
+            end+=self.state_size_n[i]
+            _, loss = self.sess.run([self.critics[i].UpdateModel,self.critics[i].loss],feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions, self.critics[i].target_Q: targets[i]})
+            start += self.state_size_n[i]
+            loss_n.append(loss)
 
         # update Actor
+        pi_n = []
+        for i in range(self.agent_num):
+            pi_n.append(self.actors[i].predict(s_batch))
+            grads = self.critics[i].action_gradients(s_batch, a_outs)
+            self.actors[i].train(s_batch, grads[0])
 
-        return loss
+
+        self.update_target()
+        return loss_n
 
     def update_target(self):
         trainable_variables = tf.trainable_variables()
-        trainable_variables_network = [var for var in trainable_variables if var.name.startswith('Q')]
-        trainable_variables_target = [var for var in trainable_variables if var.name.startswith('target')]
+        trainable_variables_Critic = [var for var in trainable_variables if var.name.startswith('Q')]
+        trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
+        trainable_variables_targetCritic = [var for var in trainable_variables if var.name.startswith('targetQ')]
+        trainable_variables_targetActor= [var for var in trainable_variables if var.name.startswith('targetPi')]
 
-        for i in range(len(trainable_variables_network)):
-            self.sess.run(tf.assign(trainable_variables_target[i], trainable_variables_network[i]))
-    # 수정 안함 =====================================================================================================================
+        for i in range(len(trainable_variables_Critic)):
+            self.sess.run(tf.assign(trainable_variables_targetCritic[i], (1-softlambda)*trainable_variables_targetCritic[i] + softlambda * trainable_variables_Critic[i]))
+        for i in range(len(trainable_variables_Actor)):
+            self.sess.run(tf.assign(trainable_variables_targetActor[i], (1-softlambda)*trainable_variables_targetActor[i] + softlambda * trainable_variables_Actor[i]))
 
+
+    def get_action(self,state,train_mode=True):
+        if train_mode == True and self.epsilon > np.random.rand():
+            return np.random.randint(0,self.action_size)
+        else:
+            predict = self.sess.run(self.model.predict,feed_dict={self.model.input:state})
+            return np.asscalar(predict)
 
     # 모든 정보는 [ batch_size x # of agents ] 형태로 저장 된다
     def append_sample(self, state_n, action_n, reward_n, next_state_n, done_n):
