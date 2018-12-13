@@ -55,7 +55,7 @@ class Critic(object):
         self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
         self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
 
-        with tf.variable_scope(name_or_scope='QNet'+model_name):
+        with tf.variable_scope(name_or_scope=model_name):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
             self.concat = tf.concat([self.mlp1, self.action_input], axis = 1)
             self.mlp2 = layer.dense(inputs=self.concat, units=64, activation = tf.nn.relu)
@@ -69,9 +69,12 @@ class Critic(object):
         self.loss = tf.losses.mean_squared_error(self.target_Q, self.q_predict)
         self.UpdateModel = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
 
+        self.action_grads = tf.gradients(self.q_predict, self.action_input)
+
 class Actor(object):
     def __init__(self, state_size, action_size, model_name="Pimodel"):
 
+        self.agent_num = 3
         # state_size = state_dim
         self.state_size = state_size
         # action_size is action_dim
@@ -79,14 +82,25 @@ class Actor(object):
 
         self.input = tf.placeholder(shape=[None, self.state_size],dtype=tf.float32)
 
-        with tf.variable_scope(name_or_scope='PiNet'+model_name):
+        with tf.variable_scope(name_or_scope=model_name):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
             self.mlp2 = layer.dense(inputs=self.mlp1, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
             self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=None)
 
+
         self.pi_predict = self.Pi_Out
+
+
+
+        trainable_variables = tf.trainable_variables()
+        trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
+        self.action_gradients = tf.placeholder(tf.float32, [None, self.action_size * self.agent_num])
+        self.actor_gradients = tf.gradients(self.pi_predict, trainable_variables_Actor, -self.action_gradients)
+        self.grads_and_vars = list(zip(self.actor_gradients, trainable_variables_Actor))
+        self.updateGradients = tf.train.AdamOptimizer(learning_rate).apply_gradients(self.grads_and_vars)
+
 
 class MADDPGAgent(object):
     def __init__(self, agent_num, state_size_n, action_size, learning_rate=0.00025, batch_size = 32, run_episode=10000, epsilon=1.0, epsilon_min=0.1, discount_factor=0.99):
@@ -103,10 +117,10 @@ class MADDPGAgent(object):
         self.action_size = action_size
         self.agent_num = agent_num
 
-        self.actors = [Actor(self.state_size_n[i], self.action_size, str(i)+"Pimodel") for i in range(agent_num)]
-        self.critics = [Critic(self.state_size_n[i], self.action_size, str(i)+"Qmodel", self.agent_num) for i in range(agent_num)]
-        self.target_actors = [Actor(self.state_size_n[i], self.action_size, str(i)+"targetPimodel") for i in range(agent_num)]
-        self.target_critics = [Critic(self.state_size_n[i], self.action_size, str(i)+"targetQmodel") for i in range(agent_num)]
+        self.actors = [Actor(self.state_size_n[i], self.action_size, "Pimodel" + str(i)) for i in range(agent_num)]
+        self.critics = [Critic(self.state_size_n[i], self.action_size, "Qmodel" + str(i), self.agent_num) for i in range(agent_num)]
+        self.target_actors = [Actor(self.state_size_n[i], self.action_size, "targetPimodel" + str(i)) for i in range(agent_num)]
+        self.target_critics = [Critic(self.state_size_n[i], self.action_size, "targetQmodel" + str(i)) for i in range(agent_num)]
 
         self.memory = deque(maxlen=mem_maxlen)
         self.batch_size = batch_size
@@ -210,12 +224,10 @@ class MADDPGAgent(object):
             loss_n.append(loss)
 
         # update Actor
-        pi_n = []
-        for i in range(self.agent_num):
-            pi_n.append(self.actors[i].predict(s_batch))
-            grads = self.critics[i].action_gradients(s_batch, a_outs)
-            self.actors[i].train(s_batch, grads[0])
-
+        pi_n = self.get_actions(states)
+        print(pi_n)
+        grads = self.action_gradients(states, pi_n)
+        self.updateActor(states, grads)
 
         self.update_target()
         return loss_n
@@ -232,13 +244,33 @@ class MADDPGAgent(object):
         for i in range(len(trainable_variables_Actor)):
             self.sess.run(tf.assign(trainable_variables_targetActor[i], (1-softlambda)*trainable_variables_targetActor[i] + softlambda * trainable_variables_Actor[i]))
 
+    def updateActor(self, states, grads):
+        start = 0
+        end = 0
+        for i in range(self.agent_num):
+            end+=self.state_size_n[i]
+            self.sess.run(self.actors[i].updateGradients, feed_dict={self.actors[i].input : states[:,start:end], self.actors[i].action_gradients : grads[i]})
+            start += self.state_size_n[i]
 
-    def get_action(self,state,train_mode=True):
-        if train_mode == True and self.epsilon > np.random.rand():
-            return np.random.randint(0,self.action_size)
-        else:
-            predict = self.sess.run(self.model.predict,feed_dict={self.model.input:state})
-            return np.asscalar(predict)
+    def action_gradients(self, states, actions):
+        start = 0
+        end = 0
+        grads = []
+        for i in range(self.agent_num):
+            end+=self.state_size_n[i]
+            grads.append(self.sess.run(self.critics[i].action_grads, feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions}))
+            start += self.state_size_n[i]
+        return grads
+
+    def get_actions(self,state, train_mode=True):
+        start = 0
+        end = 0
+        predict = []
+        for i in range(self.agent_num):
+            end+=self.state_size_n[i]
+            predict.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input:state}))
+            start += self.state_size_n[i]
+        return predict
 
     # 모든 정보는 [ batch_size x # of agents ] 형태로 저장 된다
     def append_sample(self, state_n, action_n, reward_n, next_state_n, done_n):
