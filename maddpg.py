@@ -50,15 +50,22 @@ class Critic(object):
         # state_size is [1 x state_dim * agent_num]
         self.state_size = state_size
         # action_size is [1 x action_dim * agent_num]
-        self.action_size = action_size * agent_num
+        self.action_size = action_size
+        self.agent_num = agent_num
 
         self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
-        self.action_input = [tf.placeholder(shape=[None, self.action_size], dtype=tf.float32) for _ in range(agent_num)]
+
+        # =========================================================================================================
+        self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
+        self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)])
+        # =========================================================================================================
 
         with tf.variable_scope(name_or_scope=model_name):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
-            self.concat_action = tf.concat(self.action_input, axis=1)
+            # Critic action 차원을 agent_num 만큼 placeholder를 분할 하였으므로, concatenation 이 필요하여 수정된 부분.
+            self.concat_action = tf.concat([self.action_input, self.other_actions], axis=1)
             self.concat = tf.concat([self.mlp1, self.concat_action], axis=1)
+            # =====================================================================================================
             self.mlp2 = layer.dense(inputs=self.concat, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
@@ -93,7 +100,11 @@ class Actor(object):
 
         self.pi_predict = self.Pi_Out
 
-
+        # ==============================================================================================================
+        # 현재 문제점. Critic에서 action 을 받을 때 agent_num * action_dim : 3 * 5 = 15 로 받기 때문에
+        # action_gradients의 차원이 15 입니다.
+        # 그러나 policy는 독립적이기 때문에 pi_predict 차원이 5 이기 때문에 차원 연산이 안맞는 문제가 있습니다.
+        # ==============================================================================================================
 
         trainable_variables = tf.trainable_variables()
         trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
@@ -123,7 +134,7 @@ class MADDPGAgent(object):
         self.target_actors = [Actor(self.state_size_n[i], self.action_size, "targetPimodel" + str(i)) for i in range(agent_num)]
         self.target_critics = [Critic(self.state_size_n[i], self.action_size, "targetQmodel" + str(i)) for i in range(agent_num)]
 
-        self.memory = deque(maxlen=mem_maxlen)
+        self.memory = [deque(maxlen=mem_maxlen) for _ in range(agent_num)]
         self.batch_size = batch_size
 
         # Session Initialize ####################################
@@ -149,7 +160,6 @@ class MADDPGAgent(object):
         self.Summary,self.Merge = self.make_Summary()
         #########################################################
 
-    # 수정 안함 ========================================================================================================================
     def train_model(self, done):
 
         if done:
@@ -158,7 +168,10 @@ class MADDPGAgent(object):
 
         self.batch_size = 2
 
-        mini_batch = random.sample(self.memory, self.batch_size)
+        # batch from individual memories
+        mini_batch = []
+        for i in range(self.agent_num):
+            mini_batch.append(random.sample(self.memory, self.batch_size))
 
         states = []
         actions = []
@@ -167,14 +180,16 @@ class MADDPGAgent(object):
         next_actions = []
         dones = []
 
-        # ======================================= Buffer에 데이터 저장 & 읽기 구조에 대해서 고민해봐야 할듯 ===================================
-        for i in range(self.batch_size):
-            states.append(mini_batch[i][0])
-            actions.append(mini_batch[i][1])
-            rewards.append(mini_batch[i][2])
-            next_states.append(mini_batch[i][3])
-            dones.append(mini_batch[i][4])
-        # ============================================================================================================================
+        # =================================================================================================================================
+        for j in range(self.agent_num):
+            for i in range(self.batch_size):
+                states.append(mini_batch[j][i][0])
+                actions.append(mini_batch[j][i][1])
+                rewards.append(mini_batch[j][i][2])
+                next_states.append(mini_batch[j][i][3])
+                dones.append(mini_batch[j][i][4])
+
+
 
         # [batch_size x agent_num]
         states = np.array(states)
@@ -198,16 +213,8 @@ class MADDPGAgent(object):
         end = 0
         for i in range(self.agent_num):
             end+=self.state_size_n[i]
-            feed_dict = {
-                self.critics[i].input: states[:, start:end],
-                self.critics[i].action_input: actions,
-            }
-            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict=feed_dict))
-            feed_dict = {
-                self.target_critics[i].input: next_states[:, start:end],
-                self.target_critics[i].action_input: next_actions
-            }
-            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict=feed_dict))
+            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict={self.critics[i].input: states[:, start:end], self.critics[i].action_input: actions}))
+            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict={self.target_critics[i].input: next_states[:, start:end],self.target_critics[i].action_input: next_actions}))
             start+=self.state_size_n[i]
 
         # [agent_num x batch_size]
@@ -236,6 +243,7 @@ class MADDPGAgent(object):
         pi_n = self.get_actions(states)
         grads = self.action_gradients(states, pi_n)
         self.updateActor(states, grads)
+        # =================================================================================================================================
 
         self.update_target()
         return loss_n
@@ -270,19 +278,19 @@ class MADDPGAgent(object):
             start += self.state_size_n[i]
         return grads
 
-    def get_actions(self,state, train_mode=True):
+    def get_actions(self, state, train_mode=True):
         start = 0
         end = 0
         predict = []
         for i in range(self.agent_num):
             end+=self.state_size_n[i]
-            predict.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input:state}))
+            predict.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input:state[:, start:end] }))
             start += self.state_size_n[i]
         return predict
 
     # 모든 정보는 [ batch_size x # of agents ] 형태로 저장 된다
-    def append_sample(self, state_n, action_n, reward_n, next_state_n, done_n):
-        self.memory.append((state_n, action_n, reward_n, next_state_n, done_n))
+    def append_sample(self,idx, state_n, action, other_action_n, reward_n, next_state_n, done_n):
+        self.memory[idx].append((state_n, action, other_action_n, reward_n, next_state_n, done_n))
 
     def save_model(self):
         self.Saver.save(self.sess,self.save_path + "\model.ckpt")
@@ -322,12 +330,16 @@ if __name__=="__main__":
 
     maddpg = MADDPGAgent(env.n, obs_shape_n, action_size)
 
-    # Temp ==============================================================
-    acs_n = [[1,1,1,1,1], [2,1,1,1,1], [3,1,1,1,1]]
+    # Test용 ==============================================================
+    acs_n = [[1,1,1,1,1], [2,2,2,2,2], [3,3,3,3,3]]
     next_obs_n, reward_n, done_n, _ = env.step(acs_n)
 
     # good_agent # = 2,  adversary_agent # = 1
-    maddpg.append_sample(np.hstack(obs_n), np.hstack(acs_n), np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(np.hstack(obs_n), np.hstack(acs_n), np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(0,np.hstack(obs_n), [1,1,1,1,1], [[2,2,2,2,2], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(0,np.hstack(obs_n), [1,1,1,1,1], [[2,2,2,2,2], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(1,np.hstack(obs_n), [2,2,2,2,2], [[1,1,1,1,1], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(1,np.hstack(obs_n), [2,2,2,2,2], [[1,1,1,1,1], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(2,np.hstack(obs_n), [3,3,3,3,3], [[1,1,1,1,1], [2,2,2,2,2]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
+    maddpg.append_sample(2,np.hstack(obs_n), [3,3,3,3,3], [[1,1,1,1,1], [2,2,2,2,2]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
 
     maddpg.train_model(False)
