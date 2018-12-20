@@ -109,14 +109,6 @@ class MADDPGAgent(object):
         self.batch_size = batch_size
         # =====================================
 
-        # Session Initialize =====================================
-        config = tf.ConfigProto()
-        config.gpu_options.per_process_gpu_memory_fraction = 0.3
-        self.sess = tf.Session(config=config)
-        self.init = tf.global_variables_initializer()
-        self.sess.run(self.init)
-        # ========================================================
-
         # Update Parameters ======================================
         self.epsilon = epsilon
         self.epsilon_min = epsilon_min
@@ -124,12 +116,6 @@ class MADDPGAgent(object):
         self.run_episode = run_episode
         # ========================================================
 
-        # Save & Load ============================================
-        self.Saver = tf.train.Saver(max_to_keep=5)
-        self.save_path = save_path
-        self.load_path = load_path
-        self.Summary,self.Merge = self.make_Summary()
-        # ========================================================
 
         # Placeholer =============================================================================
         self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
@@ -139,10 +125,11 @@ class MADDPGAgent(object):
         self.reward = tf.placeholder(shape=[None, 1], dtype=tf.float32)
         # ========================================================================================
 
-        self.actor = Actor(self.state_size, self.action_size, input, "Pimodel" + str(idx))
-        self.critic = Critic(self.state_size, self.action_size, self.input, self.action_input, self.other_actions, "Qmodel" + str(idx), self.agent_num, reuse=False)
+        self.actor = Actor(self.state_size, self.action_size, input, "Pimodel_" + idx)
+        self.critic = Critic(self.state_size, self.action_size, self.input, self.action_input, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=False)
 
-        self.actor_loss = -tf.reduce_mean(Critic(self.state_size, self.action_size, self.input, self.actor.pi_predict, self.other_actions, "Qmodel" + str(idx), self.agent_num, reuse=True))
+        self.critic_grads = Critic(self.state_size, self.action_size, self.input, self.actor.pi_predict, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=True)
+        self.actor_loss = -tf.reduce_mean(self.critic_grads.q_predict)
         self.actor_train = self.actor.actor_optimizer.minimize(self.actor_loss)
 
         self.critic_loss = tf.reduce_mean(tf.square(self.target_Q - self.critic.q_predict))
@@ -161,190 +148,3 @@ class MADDPGAgent(object):
     def Q(self, state, action, other_action, sess):
         return sess.run(self.critic.q_predict,
                         {self.input: state, self.action_input: action, self.other_actions: other_action})
-
-# ====================================================================================================================================================================================================
-
-    def train_model(self, done):
-
-        if done:
-            if self.epsilon > self.epsilon_min:
-                self.epsilon -= 1/self.run_episode
-
-        self.batch_size = 2
-
-        # batch from individual memories
-
-        mini_batch = []
-        for i in range(self.agent_num):
-            mini_batch.append(random.sample(self.memory, self.batch_size))
-
-        states = []
-        actions = []
-        rewards = []
-        next_states = []
-        next_actions = []
-        dones = []
-
-        # =================================================================================================================================
-        for j in range(self.agent_num):
-            for i in range(self.batch_size):
-                states.append(mini_batch[j][i][0])
-                actions.append(mini_batch[j][i][1])
-                rewards.append(mini_batch[j][i][2])
-                next_states.append(mini_batch[j][i][3])
-                dones.append(mini_batch[j][i][4])
-
-
-
-        # [batch_size x agent_num]
-        states = np.array(states)
-        next_states = np.array(next_states)
-        actions = np.array(actions)
-        rewards = np.array(rewards)
-
-        start = 0
-        end = 0
-        for i in range(self.agent_num):
-            end += self.state_size_n[i]
-            next_actions.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input: states[:,start:end]}))
-            start += self.state_size_n[i]
-
-        # actions reshape =====================
-        next_actions = np.hstack(next_actions)
-        # =====================================
-        targets = []
-        target_vals = []
-        start = 0
-        end = 0
-        for i in range(self.agent_num):
-            end+=self.state_size_n[i]
-            targets.append(self.sess.run(self.critics[i].q_predict,feed_dict={self.critics[i].input: states[:, start:end], self.critics[i].action_input: actions}))
-            target_vals.append(self.sess.run(self.target_critics[i].q_predict,feed_dict={self.target_critics[i].input: next_states[:, start:end],self.target_critics[i].action_input: next_actions}))
-            start+=self.state_size_n[i]
-
-        # [agent_num x batch_size]
-        targets = np.array(targets)
-        target_vals = np.array(target_vals)
-
-        # calculate y^
-        for i in range(self.batch_size):
-            for j in range(self.agent_num):
-                if dones[i][j]:
-                    targets[j][i] = rewards[i][j]
-                else:
-                    targets[j][i] = rewards[i][j] + self.discount_factor*target_vals[j][i]
-
-        # update Critic
-        start = 0
-        end = 0
-        loss_n = []
-        for i in range(self.agent_num):
-            end+=self.state_size_n[i]
-            _, loss = self.sess.run([self.critics[i].UpdateModel,self.critics[i].loss],feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions, self.critics[i].target_Q: targets[i]})
-            start += self.state_size_n[i]
-            loss_n.append(loss)
-
-        # update Actor
-        pi_n = self.get_actions(states)
-        grads = self.action_gradients(states, pi_n)
-        self.updateActor(states, grads)
-        # =================================================================================================================================
-
-        self.update_target()
-        return loss_n
-
-    def update_target(self):
-        trainable_variables = tf.trainable_variables()
-        trainable_variables_Critic = [var for var in trainable_variables if var.name.startswith('Q')]
-        trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
-        trainable_variables_targetCritic = [var for var in trainable_variables if var.name.startswith('targetQ')]
-        trainable_variables_targetActor= [var for var in trainable_variables if var.name.startswith('targetPi')]
-
-        for i in range(len(trainable_variables_Critic)):
-            self.sess.run(tf.assign(trainable_variables_targetCritic[i], (1-softlambda)*trainable_variables_targetCritic[i] + softlambda * trainable_variables_Critic[i]))
-        for i in range(len(trainable_variables_Actor)):
-            self.sess.run(tf.assign(trainable_variables_targetActor[i], (1-softlambda)*trainable_variables_targetActor[i] + softlambda * trainable_variables_Actor[i]))
-
-    def updateActor(self, states, grads):
-        start = 0
-        end = 0
-        for i in range(self.agent_num):
-            end+=self.state_size_n[i]
-            self.sess.run(self.actors[i].updateGradients, feed_dict={self.actors[i].input : states[:,start:end], self.actors[i].action_gradients : grads[i]})
-            start += self.state_size_n[i]
-
-    def action_gradients(self, states, actions):
-        start = 0
-        end = 0
-        grads = []
-        for i in range(self.agent_num):
-            end+=self.state_size_n[i]
-            grads.append(self.sess.run(self.critics[i].action_grads, feed_dict={self.critics[i].input: states[:,start:end], self.critics[i].action_input: actions}))
-            start += self.state_size_n[i]
-        return grads
-
-    def get_actions(self, state, train_mode=True):
-        start = 0
-        end = 0
-        predict = []
-        for i in range(self.agent_num):
-            end+=self.state_size_n[i]
-            predict.append(self.sess.run(self.actors[i].pi_predict, feed_dict={self.actors[i].input:state[:, start:end] }))
-            start += self.state_size_n[i]
-        return predict
-
-    # 모든 정보는 [ batch_size x # of agents ] 형태로 저장 된다
-    def append_sample(self,idx, state_n, action, other_action_n, reward_n, next_state_n, done_n):
-        self.memory[idx].append((state_n, action, other_action_n, reward_n, next_state_n, done_n))
-
-    def save_model(self):
-        self.Saver.save(self.sess,self.save_path + "\model.ckpt")
-
-    def make_Summary(self):
-        self.summary_loss = tf.placeholder(dtype=tf.float32)
-        self.summary_reward = tf.placeholder(dtype=tf.float32)
-        tf.summary.scalar("loss", self.summary_loss)
-        tf.summary.scalar("reward",self.summary_reward)
-        return tf.summary.FileWriter(logdir=save_path,graph=self.sess.graph),tf.summary.merge_all()
-
-    def Write_Summray(self,reward,loss,episode):
-        self.Summary.add_summary(self.sess.run(self.Merge,feed_dict={self.summary_loss:loss,self.summary_reward:reward}),episode)
-
-
-if __name__=="__main__":
-    # Particle-environment
-    # https://github.com/openai/multiagent-particle-envs
-    # MADDPG
-    # https://github.com/xuehy/pytorch-maddpg/blob/master/MADDPG.py
-
-    print(tf.__version__)
-
-    # load scenario from script
-    scenario = scenarios.load('simple_adversary.py').Scenario()
-    # create world
-    world = scenario.make_world()
-    # create multiagent environment
-    env = MultiAgentEnv(world, scenario.reset_world, scenario.reward, scenario.observation, info_callback=None,
-                        shared_viewer=True)
-    env.render()
-    obs_n = env.reset()
-    print("# of agent {}".format(env.n))
-    obs_shape_n = [np.array(env.observation_space[i].shape)[0] for i in range(env.n)]
-    print("observation dim : {}".format(obs_shape_n))
-    print("action dim : {}".format(action_size))
-
-    maddpg = MADDPGAgent(env.n, obs_shape_n, action_size)
-
-    # Test용 ==============================================================
-    acs_n = [[1,1,1,1,1], [2,2,2,2,2], [3,3,3,3,3]]
-    next_obs_n, reward_n, done_n, _ = env.step(acs_n)
-
-    # good_agent # = 2,  adversary_agent # = 1
-    maddpg.append_sample(0,np.hstack(obs_n), [1,1,1,1,1], [[2,2,2,2,2], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(0,np.hstack(obs_n), [1,1,1,1,1], [[2,2,2,2,2], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(1,np.hstack(obs_n), [2,2,2,2,2], [[1,1,1,1,1], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(1,np.hstack(obs_n), [2,2,2,2,2], [[1,1,1,1,1], [3,3,3,3,3]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(2,np.hstack(obs_n), [3,3,3,3,3], [[1,1,1,1,1], [2,2,2,2,2]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-    maddpg.append_sample(2,np.hstack(obs_n), [3,3,3,3,3], [[1,1,1,1,1], [2,2,2,2,2]], np.hstack(reward_n), np.hstack(next_obs_n), done_n)
-
-    maddpg.train_model(False)
