@@ -84,7 +84,7 @@ class Actor(object):
             self.mlp2 = layer.dense(inputs=self.mlp1, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
-            self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=None)
+            self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=tf.nn.tanh)
         self.pi_predict = self.Pi_Out
         self.actor_optimizer = tf.train.AdamOptimizer(learning_rate)
 
@@ -120,12 +120,12 @@ class MADDPGAgent(object):
         # Placeholer =============================================================================
         self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
         self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
-        self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)])
+        self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)], dtype=tf.float32)
         self.target_Q = tf.placeholder(shape=[None,1],dtype=tf.float32)
         self.reward = tf.placeholder(shape=[None, 1], dtype=tf.float32)
         # ========================================================================================
 
-        self.actor = Actor(self.state_size, self.action_size, input, "Pimodel_" + idx)
+        self.actor = Actor(self.state_size, self.action_size, self.input, "Pimodel_" + idx)
         self.critic = Critic(self.state_size, self.action_size, self.input, self.action_input, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=False)
 
         self.critic_grads = Critic(self.state_size, self.action_size, self.input, self.actor.pi_predict, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=True)

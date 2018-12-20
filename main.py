@@ -44,20 +44,39 @@ load_path = ""
 ###########################################
 
 
-def get_agents_action(obs_n, sess, noise_rate=0.0):
-    agent1_action = agent1_ddpg.action(state=obs_n[0], sess=sess) + np.random.randn(2) * noise_rate
-    agent2_action = agent2_ddpg.action(state=obs_n[1], sess=sess) + np.random.randn(2) * noise_rate
-    agent3_action = agent3_ddpg.action(state=obs_n[2], sess=sess) + np.random.randn(2) * noise_rate
+def get_agents_action(obs_n, obs_shape_n, sess, noise_rate=0.0):
+    agent1_action = agent1_ddpg.action(state=np.reshape(obs_n[0], newshape=[-1,obs_shape_n[0]]), sess=sess) + np.random.randn(5) * noise_rate
+    agent2_action = agent2_ddpg.action(state=np.reshape(obs_n[1], newshape=[-1,obs_shape_n[1]]), sess=sess) + np.random.randn(5) * noise_rate
+    agent3_action = agent3_ddpg.action(state=np.reshape(obs_n[2], newshape=[-1,obs_shape_n[2]]), sess=sess) + np.random.randn(5) * noise_rate
 
     return agent1_action, agent2_action, agent3_action
 
-def train_agent(agent_ddpg, agent_ddpg_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess):
+def train_agent(agent, agent_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess):
     obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = agent_memory.sample(batch_size)
-    new_action_batch = agent_ddpg.action(next_obs_batch, sess)
-    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_ddpg_target.Q(state=next_obs_batch, action=new_action_batch,
-                                                                      sess=sess)
-    agent_ddpg.train_actor(state=obs_batch, sess=sess)
-    agent_ddpg.train_critic(state=obs_batch, action=act_batch, target=target, sess=sess)
+    new_action_batch = agent.action(next_obs_batch, sess)
+    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_target.Q(state=next_obs_batch, action=new_action_batch, sess=sess)
+    agent.train_actor(state=obs_batch, sess=sess)
+    agent.train_critic(state=obs_batch, action=act_batch, target=target, sess=sess)
+
+    sess.run([agent_actor_target_update, agent_critic_target_update])
+
+def train_agent(agent_ddpg, agent_ddpg_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess, other_actors):
+    total_obs_batch, total_act_batch, rew_batch, total_next_obs_batch, done_mask = agent_memory.sample(32)
+
+    act_batch = total_act_batch[:, 0, :]
+    other_act_batch = np.hstack([total_act_batch[:, 1, :], total_act_batch[:, 2, :]])
+
+    obs_batch = total_obs_batch[:, 0, :]
+
+    next_obs_batch = total_next_obs_batch[:, 0, :]
+    next_other_actor1_o = total_next_obs_batch[:, 1, :]
+    next_other_actor2_o = total_next_obs_batch[:, 2, :]
+
+    next_other_action = np.hstack([other_actors[0].action(next_other_actor1_o, sess), other_actors[1].action(next_other_actor2_o, sess)])
+    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_ddpg_target.Q(state=next_obs_batch, action=agent_ddpg.action(next_obs_batch, sess),
+                                                                     other_action=next_other_action, sess=sess)
+    agent_ddpg.train_actor(state=obs_batch, other_action=other_act_batch, sess=sess)
+    agent_ddpg.train_critic(state=obs_batch, action=act_batch, other_action=other_act_batch, target=target, sess=sess)
 
     sess.run([agent_actor_target_update, agent_critic_target_update])
 
@@ -95,13 +114,13 @@ if __name__=="__main__":
 
     # Agent Generation =======================================
     agent1_ddpg = MADDPGAgent(env.n, obs_shape_n[0], action_size, '1')
-    agent1_ddpg_target = MADDPGAgent(env.n, obs_shape_n, action_size, 'target1')
+    agent1_ddpg_target = MADDPGAgent(env.n, obs_shape_n[0], action_size, 'target1')
 
     agent2_ddpg = MADDPGAgent(env.n, obs_shape_n[1], action_size, '2')
-    agent2_ddpg_target = MADDPGAgent(env.n, obs_shape_n, action_size, 'target2')
+    agent2_ddpg_target = MADDPGAgent(env.n, obs_shape_n[1], action_size, 'target2')
 
     agent3_ddpg = MADDPGAgent(env.n, obs_shape_n[2], action_size, '3')
-    agent3_ddpg_target = MADDPGAgent(env.n, obs_shape_n, action_size, 'target3')
+    agent3_ddpg_target = MADDPGAgent(env.n, obs_shape_n[2], action_size, 'target3')
 
     # Save & Load ============================================
     Saver = tf.train.Saver(max_to_keep=5)
@@ -145,35 +164,41 @@ if __name__=="__main__":
     # ========================================================
 
     # Test용 ==============================================================
-    acs_n = [[1,1,1,1,1], [2,2,2,2,2], [3,3,3,3,3]]
-    next_obs_n, reward_n, done_n, _ = env.step(acs_n)
-
-    # good_agent # = 2,  adversary_agent # = 1
-
     e = 1
-
-    for i in range(1000000):
-        if i % 1000 == 0:
+    train_mode = True
+    for roll_out in range(1000000):
+        env.render()
+        if roll_out % 1000 == 0:
             obs_n = env.reset()
 
-        agent1_action, agent2_action, agent3_action = get_agents_action(obs_n, sess, noise_rate=0.2)
-        
-        a = [[0, i[0][0], 0, i[0][1], 0] for i in [agent1_action, agent2_action, agent3_action]]
+        agent1_action, agent2_action, agent3_action = get_agents_action(obs_n, obs_shape_n, sess, noise_rate=0.2)
 
-        a.append([0, np.random.rand() * 2 - 1, 0, np.random.rand() * 2 - 1, 0])
+        # Discrete action space ================
+        acs_agent1 = np.zeros((action_size,))
+        acs_agent2 = np.zeros((action_size,))
+        acs_agent3 = np.zeros((action_size,))
 
-        o_n_next, r_n, d_n, i_n = env.step(a)
+        acs = []
+        if train_mode == True and e > np.random.rand():
+            for agent_index in range(env.n):
+                acs.append(np.random.randint(0,action_size))
+        print(acs)
+        acs_agent1[acs[0]] = 1
+        acs_agent2[acs[1]] = 1
+        acs_agent3[acs[2]] = 1
+        acs_n = [acs_agent1, acs_agent2, acs_agent3]
+        # ======================================
 
-        for agent_index in range(3):
-            reward_100_list[agent_index].append(r_n[agent_index])
-            reward_100_list[agent_index] = reward_100_list[agent_index][-1000:]
+        next_obs_n, reward_n, done_n, _ = env.step(acs_n)
 
-        agent1_memory.add(o_n[0], agent1_action[0], r_n[0], o_n_next[0], False)
-        agent2_memory.add(o_n[1], agent2_action[0], r_n[1], o_n_next[1], False)
-        agent3_memory.add(o_n[2], agent3_action[0], r_n[2], o_n_next[2], False)
+        # good_agent # = 2,  adversary_agent # = 1
+        o_n_next, r_n, d_n, i_n = env.step(acs_n)
 
-        if i > 50000:
-            # print('train')
+        agent1_memory.add(obs_n[0], agent1_action[0], r_n[0], o_n_next[0], d_n[0])
+        agent2_memory.add(obs_n[1], agent2_action[0], r_n[1], o_n_next[1], d_n[1])
+        agent3_memory.add(obs_n[2], agent3_action[0], r_n[2], o_n_next[2], d_n[2])
+
+        if roll_out > 50000:
             e *= 0.9999
             # agent1 train
             train_agent(agent1_ddpg, agent1_ddpg_target, agent1_memory, agent1_actor_target_update,
@@ -185,19 +210,15 @@ if __name__=="__main__":
             train_agent(agent3_ddpg, agent3_ddpg_target, agent3_memory, agent3_actor_target_update,
                         agent3_critic_target_update, sess)
 
+        # Agent Reward Tensorboard ===================================================================
         for agent_index in range(3):
             summary_writer.add_summary(
-                sess.run(agent_reward_op[agent_index], {agent_reward_v[agent_index]: r_n[agent_index]}), i)
-            summary_writer.add_summary(sess.run(agent_a1_op[agent_index], {agent_a1[agent_index]: a[agent_index][1]}),
-                                       i)
-            summary_writer.add_summary(sess.run(agent_a2_op[agent_index], {agent_a2[agent_index]: a[agent_index][3]}),
-                                       i)
-            summary_writer.add_summary(sess.run(reward_100_op[agent_index], {
-                reward_100[agent_index]: np.mean(reward_100_list[agent_index][-100:])}), i)
+                sess.run(reward_op[agent_index], {reward_history[agent_index]: r_n[agent_index]}), roll_out)
+        # ============================================================================================
+        if roll_out % 1000 == 0:
+            Saver.save(sess, './three_weight/' + str(roll_out) + '.cptk')
 
         o_n = o_n_next
 
-        if i % 1000 == 0:
-            saver.save(sess, './three_weight/' + str(i) + '.cptk')
 
 
