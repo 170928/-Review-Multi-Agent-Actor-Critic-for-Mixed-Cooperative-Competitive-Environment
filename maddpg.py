@@ -45,50 +45,39 @@ numGoals = 3
 ###########################################
 
 class Critic(object):
-    def __init__(self, state_size, action_size,  model_name="Qmodel", agent_num = 3):
+    def __init__(self, state_size, action_size, input, action_input, other_action, model_name="Qmodel", agent_num=3, reuse=False):
 
-        # state_size is [1 x state_dim * agent_num]
         self.state_size = state_size
-        # action_size is [1 x action_dim * agent_num]
         self.action_size = action_size
         self.agent_num = agent_num
 
-        self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
+        # =================================
+        self.input = input
+        self.action_input = action_input
+        self.other_actions = other_action
+        # =================================
 
-        # =========================================================================================================
-        self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
-        self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)])
-        # =========================================================================================================
-
-        with tf.variable_scope(name_or_scope=model_name):
+        with tf.variable_scope(name_or_scope=model_name, reuse=reuse):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
-            # Critic action 차원을 agent_num 만큼 placeholder를 분할 하였으므로, concatenation 이 필요하여 수정된 부분.
             self.concat_action = tf.concat([self.action_input, self.other_actions], axis=1)
             self.concat = tf.concat([self.mlp1, self.concat_action], axis=1)
-            # =====================================================================================================
             self.mlp2 = layer.dense(inputs=self.concat, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
             self.Q_Out = layer.dense(self.mlp4, units=1, activation=None)
-
         self.q_predict = self.Q_Out
-
-        self.target_Q = tf.placeholder(shape=[None,1],dtype=tf.float32)
-        self.loss = tf.losses.mean_squared_error(self.target_Q, self.q_predict)
-        self.UpdateModel = tf.train.AdamOptimizer(learning_rate).minimize(self.loss)
-
-        self.action_grads = tf.gradients(self.q_predict, self.action_input)
+        self.critic_optimizer = tf.train.AdamOptimizer(learning_rate)
 
 class Actor(object):
-    def __init__(self, state_size, action_size, model_name="Pimodel"):
+    def __init__(self, state_size, action_size, input, model_name="Pimodel"):
 
         self.agent_num = 3
-        # state_size = state_dim
         self.state_size = state_size
-        # action_size is action_dim
         self.action_size = action_size
 
-        self.input = tf.placeholder(shape=[None, self.state_size],dtype=tf.float32)
+        # =================================
+        self.input = input
+        # =================================
 
         with tf.variable_scope(name_or_scope=model_name):
             self.mlp1 = layer.dense(inputs=self.input, units=64, activation = tf.nn.relu)
@@ -96,26 +85,11 @@ class Actor(object):
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
             self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=None)
-
-
         self.pi_predict = self.Pi_Out
-
-        # ==============================================================================================================
-        # 현재 문제점. Critic에서 action 을 받을 때 agent_num * action_dim : 3 * 5 = 15 로 받기 때문에
-        # action_gradients의 차원이 15 입니다.
-        # 그러나 policy는 독립적이기 때문에 pi_predict 차원이 5 이기 때문에 차원 연산이 안맞는 문제가 있습니다.
-        # ==============================================================================================================
-
-        trainable_variables = tf.trainable_variables()
-        trainable_variables_Actor = [var for var in trainable_variables if var.name.startswith('Pi')]
-        #self.action_gradients = tf.placeholder(tf.float32, [None, self.action_size * self.agent_num])
-        #self.actor_gradients = tf.gradients(self.pi_predict, trainable_variables_Actor, -self.action_gradients)
-        #self.grads_and_vars = list(zip(self.actor_gradients, trainable_variables_Actor))
-        #self.updateGradients = tf.train.AdamOptimizer(learning_rate).apply_gradients(self.grads_and_vars)
-
+        self.actor_optimizer = tf.train.AdamOptimizer(learning_rate)
 
 class MADDPGAgent(object):
-    def __init__(self, agent_num, state_size_n, action_size, learning_rate=0.00025, batch_size = 32, run_episode=10000, epsilon=1.0, epsilon_min=0.1, discount_factor=0.99):
+    def __init__(self, agent_num, state_size, action_size, idx, learning_rate=0.00025, batch_size = 32, run_episode=10000, epsilon=1.0, epsilon_min=0.1, discount_factor=0.99):
         # (1) "actor" : agent in reinforcement learning
         # (2) "critic" : helps the actor decide what actions to reinforce during training.
         # Traditionally, the critic tries to predict the value (i.e. the reward we expect to get in the future) of an action in a particular state s(t)
@@ -124,41 +98,71 @@ class MADDPGAgent(object):
         # variation of reward makes the update pertuative
         # In maddpg, we enhance our critics so they can access the observations and actions of all the agents,
 
-        # various state size can exist.
-        self.state_size_n = state_size_n
+        # Default Environment Information =====
+        self.state_size = state_size
         self.action_size = action_size
         self.agent_num = agent_num
+        # =====================================
 
-        self.actors = [Actor(self.state_size_n[i], self.action_size, "Pimodel" + str(i)) for i in range(agent_num)]
-        self.critics = [Critic(self.state_size_n[i], self.action_size, "Qmodel" + str(i), self.agent_num) for i in range(agent_num)]
-        self.target_actors = [Actor(self.state_size_n[i], self.action_size, "targetPimodel" + str(i)) for i in range(agent_num)]
-        self.target_critics = [Critic(self.state_size_n[i], self.action_size, "targetQmodel" + str(i)) for i in range(agent_num)]
-
-        self.memory = [deque(maxlen=mem_maxlen) for _ in range(agent_num)]
+        # Experience Buffer ===================
+        self.memory = deque(maxlen=mem_maxlen)
         self.batch_size = batch_size
+        # =====================================
 
-        # Session Initialize ####################################
+        # Session Initialize =====================================
         config = tf.ConfigProto()
         config.gpu_options.per_process_gpu_memory_fraction = 0.3
         self.sess = tf.Session(config=config)
         self.init = tf.global_variables_initializer()
         self.sess.run(self.init)
-        #########################################################
+        # ========================================================
 
-        # Update Parameters ####################################
+        # Update Parameters ======================================
         self.epsilon = epsilon
         self.epsilon_min = epsilon_min
         self.discount_factor = discount_factor
         self.run_episode = run_episode
-        #########################################################
+        # ========================================================
 
-
-        # Save & Load ###########################################
+        # Save & Load ============================================
         self.Saver = tf.train.Saver(max_to_keep=5)
         self.save_path = save_path
         self.load_path = load_path
         self.Summary,self.Merge = self.make_Summary()
-        #########################################################
+        # ========================================================
+
+        # Placeholer =============================================================================
+        self.input = tf.placeholder(shape=[None, self.state_size], dtype=tf.float32)
+        self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
+        self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)])
+        self.target_Q = tf.placeholder(shape=[None,1],dtype=tf.float32)
+        self.reward = tf.placeholder(shape=[None, 1], dtype=tf.float32)
+        # ========================================================================================
+
+        self.actor = Actor(self.state_size, self.action_size, input, "Pimodel" + str(idx))
+        self.critic = Critic(self.state_size, self.action_size, self.input, self.action_input, self.other_actions, "Qmodel" + str(idx), self.agent_num, reuse=False)
+
+        self.actor_loss = -tf.reduce_mean(Critic(self.state_size, self.action_size, self.input, self.actor.pi_predict, self.other_actions, "Qmodel" + str(idx), self.agent_num, reuse=True))
+        self.actor_train = self.actor.actor_optimizer.minimize(self.actor_loss)
+
+        self.critic_loss = tf.reduce_mean(tf.square(self.target_Q - self.critic.q_predict))
+        self.critic_train = self.critic.critic_optimizer.minimize(self.critic_loss)
+
+    def train_actor(self, state, other_action, sess):
+        sess.run(self.actor_train, {self.input: state, self.other_actions: other_action})
+
+    def train_critic(self, state, action, other_action, target, sess):
+        sess.run(self.critic_train,
+                 {self.input: state, self.action_input: action, self.other_actions: other_action, self.target_Q: target})
+
+    def action(self, state, sess):
+        return sess.run(self.actor.pi_predict, {self.input: state})
+
+    def Q(self, state, action, other_action, sess):
+        return sess.run(self.critic.q_predict,
+                        {self.input: state, self.action_input: action, self.other_actions: other_action})
+
+# ====================================================================================================================================================================================================
 
     def train_model(self, done):
 
@@ -169,6 +173,7 @@ class MADDPGAgent(object):
         self.batch_size = 2
 
         # batch from individual memories
+
         mini_batch = []
         for i in range(self.agent_num):
             mini_batch.append(random.sample(self.memory, self.batch_size))
