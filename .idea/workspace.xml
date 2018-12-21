@@ -2,8 +2,24 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="9923c0d5-3129-4436-9c36-2720c08eb341" name="Default Changelist" comment="">
-      <change beforePath="$PROJECT_DIR$/maddpg.py" beforeDir="false" afterPath="$PROJECT_DIR$/maddpg.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/main.py" beforeDir="false" afterPath="$PROJECT_DIR$/main.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/46000.cptk.data-00000-of-00001" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/46000.cptk.data-00000-of-00001" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/46000.cptk.index" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/46000.cptk.index" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/46000.cptk.meta" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/46000.cptk.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/47000.cptk.data-00000-of-00001" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/47000.cptk.data-00000-of-00001" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/47000.cptk.index" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/47000.cptk.index" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/47000.cptk.meta" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/47000.cptk.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/48000.cptk.data-00000-of-00001" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/48000.cptk.data-00000-of-00001" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/48000.cptk.index" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/48000.cptk.index" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/48000.cptk.meta" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/48000.cptk.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/49000.cptk.data-00000-of-00001" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/49000.cptk.data-00000-of-00001" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/49000.cptk.index" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/49000.cptk.index" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/49000.cptk.meta" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/49000.cptk.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/50000.cptk.data-00000-of-00001" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/50000.cptk.data-00000-of-00001" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/50000.cptk.index" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/50000.cptk.index" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/50000.cptk.meta" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/50000.cptk.meta" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/three_weight/checkpoint" beforeDir="false" afterPath="$PROJECT_DIR$/three_weight/checkpoint" afterDir="false" />
     </list>
     <option name="EXCLUDED_CONVERTED_TO_IGNORED" value="true" />
     <option name="SHOW_DIALOG" value="false" />
@@ -14,21 +30,9 @@
   <component name="FileEditorManager">
     <leaf SIDE_TABS_SIZE_LIMIT_KEY="300">
       <file pinned="false" current-in-tab="false">
-        <entry file="file://$PROJECT_DIR$/maddpg.py">
-          <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="331">
-              <caret line="138" column="78" selection-start-line="138" selection-start-column="78" selection-end-line="138" selection-end-column="78" />
-              <folding>
-                <element signature="e#0#18#0" expanded="true" />
-              </folding>
-            </state>
-          </provider>
-        </entry>
-      </file>
-      <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/multiagent/environment.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="298">
+            <state>
               <caret line="173" selection-start-line="173" selection-end-line="173" />
               <folding>
                 <element signature="e#0#10#0" expanded="true" />
@@ -40,8 +44,8 @@
       <file pinned="false" current-in-tab="true">
         <entry file="file://$PROJECT_DIR$/main.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="160">
-              <caret line="67" lean-forward="true" selection-start-line="67" selection-end-line="67" />
+            <state relative-caret-position="416">
+              <caret line="186" column="46" selection-start-line="186" selection-start-column="46" selection-end-line="186" selection-end-column="46" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
               </folding>
@@ -52,7 +56,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/ReplayBuffer.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="646">
+            <state relative-caret-position="627">
               <caret line="34" column="33" selection-start-line="34" selection-start-column="33" selection-end-line="34" selection-end-column="33" />
               <folding>
                 <element signature="e#0#18#0" expanded="true" />
@@ -64,7 +68,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/temp.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="462">
+            <state relative-caret-position="1672">
               <caret line="88" column="17" selection-start-line="88" selection-start-column="17" selection-end-line="88" selection-end-column="17" />
             </state>
           </provider>
@@ -104,7 +108,7 @@
       <file pinned="false" current-in-tab="false">
         <entry file="file://$PROJECT_DIR$/Socoban_DQN_TF_Kyushik.py">
           <provider selected="true" editor-type-id="text-editor">
-            <state relative-caret-position="188">
+            <state relative-caret-position="2090">
               <caret line="118" column="6" selection-start-line="118" selection-start-column="6" selection-end-line="119" selection-end-column="56" />
               <folding>
                 <element signature="e#0#31#0" expanded="true" />
@@ -161,11 +165,11 @@
       </list>
     </option>
   </component>
-  <component name="ProjectFrameBounds">
-    <option name="x" value="258" />
-    <option name="y" value="14" />
+  <component name="ProjectFrameBounds" extendedState="6">
+    <option name="x" value="99" />
+    <option name="y" value="132" />
     <option name="width" value="1550" />
-    <option name="height" value="1027" />
+    <option name="height" value="853" />
   </component>
   <component name="ProjectView">
     <navigator proportions="" version="1">
@@ -341,14 +345,15 @@
     </todo-panel>
   </component>
   <component name="ToolWindowManager">
-    <frame x="258" y="14" width="1550" height="1027" extended-state="0" />
+    <frame x="-8" y="-8" width="1936" height="1056" extended-state="6" />
+    <editor active="true" />
     <layout>
-      <window_info active="true" content_ui="combo" id="Project" order="0" visible="true" weight="0.31150794" />
+      <window_info content_ui="combo" id="Project" order="0" visible="true" weight="0.24815595" />
       <window_info id="Structure" order="1" side_tool="true" weight="0.25" />
       <window_info id="Favorites" order="2" side_tool="true" />
       <window_info anchor="bottom" id="Message" order="0" />
       <window_info anchor="bottom" id="Find" order="1" />
-      <window_info anchor="bottom" id="Run" order="2" weight="0.35050392" />
+      <window_info active="true" anchor="bottom" id="Run" order="2" visible="true" weight="0.35032538" />
       <window_info anchor="bottom" id="Debug" order="3" weight="0.4" />
       <window_info anchor="bottom" id="Cvs" order="4" weight="0.25" />
       <window_info anchor="bottom" id="Inspection" order="5" weight="0.4" />
@@ -429,6 +434,49 @@
         </state>
       </provider>
     </entry>
+    <entry file="file://$PROJECT_DIR$/maddpg.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="2432">
+          <caret line="138" column="78" selection-start-line="138" selection-start-column="78" selection-end-line="138" selection-end-column="78" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/multiagent/environment.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state>
+          <caret line="173" selection-start-line="173" selection-end-line="173" />
+          <folding>
+            <element signature="e#0#10#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/ReplayBuffer.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="627">
+          <caret line="34" column="33" selection-start-line="34" selection-start-column="33" selection-end-line="34" selection-end-column="33" />
+          <folding>
+            <element signature="e#0#18#0" expanded="true" />
+          </folding>
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/temp.py">
+      <provider selected="true" editor-type-id="text-editor">
+        <state relative-caret-position="1672">
+          <caret line="88" column="17" selection-start-line="88" selection-start-column="17" selection-end-line="88" selection-end-column="17" />
+        </state>
+      </provider>
+    </entry>
+    <entry file="file://$PROJECT_DIR$/make_env.py">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
+    <entry file="file://$PROJECT_DIR$/LICENSE.txt">
+      <provider selected="true" editor-type-id="text-editor" />
+    </entry>
     <entry file="file://$PROJECT_DIR$/bin/interactive.py">
       <provider selected="true" editor-type-id="text-editor">
         <state relative-caret-position="342">
@@ -446,42 +494,9 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/LICENSE.txt">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/make_env.py">
-      <provider selected="true" editor-type-id="text-editor" />
-    </entry>
-    <entry file="file://$PROJECT_DIR$/ReplayBuffer.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="646">
-          <caret line="34" column="33" selection-start-line="34" selection-start-column="33" selection-end-line="34" selection-end-column="33" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/temp.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="462">
-          <caret line="88" column="17" selection-start-line="88" selection-start-column="17" selection-end-line="88" selection-end-column="17" />
-        </state>
-      </provider>
-    </entry>
-    <entry file="file://$PROJECT_DIR$/multiagent/environment.py">
-      <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="298">
-          <caret line="173" selection-start-line="173" selection-end-line="173" />
-          <folding>
-            <element signature="e#0#10#0" expanded="true" />
-          </folding>
-        </state>
-      </provider>
-    </entry>
     <entry file="file://$PROJECT_DIR$/Socoban_DQN_TF_Kyushik.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="188">
+        <state relative-caret-position="2090">
           <caret line="118" column="6" selection-start-line="118" selection-start-column="6" selection-end-line="119" selection-end-column="56" />
           <folding>
             <element signature="e#0#31#0" expanded="true" />
@@ -489,20 +504,17 @@
         </state>
       </provider>
     </entry>
-    <entry file="file://$PROJECT_DIR$/maddpg.py">
+    <entry file="file://$USER_HOME$/Desktop/1545319360_197___01-Project_Submission_due_Decem_submissions/김민영_18708_238450_20133525 김민영/20133525_Kimminyoung.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="331">
-          <caret line="138" column="78" selection-start-line="138" selection-start-column="78" selection-end-line="138" selection-end-column="78" />
-          <folding>
-            <element signature="e#0#18#0" expanded="true" />
-          </folding>
+        <state relative-caret-position="161">
+          <caret line="420" column="4" lean-forward="true" selection-start-line="420" selection-start-column="4" selection-end-line="420" selection-end-column="4" />
         </state>
       </provider>
     </entry>
     <entry file="file://$PROJECT_DIR$/main.py">
       <provider selected="true" editor-type-id="text-editor">
-        <state relative-caret-position="160">
-          <caret line="67" lean-forward="true" selection-start-line="67" selection-end-line="67" />
+        <state relative-caret-position="416">
+          <caret line="186" column="46" selection-start-line="186" selection-start-column="46" selection-end-line="186" selection-end-column="46" />
           <folding>
             <element signature="e#0#18#0" expanded="true" />
           </folding>

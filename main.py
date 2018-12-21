@@ -51,16 +51,8 @@ def get_agents_action(obs_n, obs_shape_n, sess, noise_rate=0.0):
 
     return agent1_action, agent2_action, agent3_action
 
-def train_agent(agent, agent_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess):
-    obs_batch, act_batch, rew_batch, next_obs_batch, done_mask = agent_memory.sample(batch_size)
-    new_action_batch = agent.action(next_obs_batch, sess)
-    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_target.Q(state=next_obs_batch, action=new_action_batch, sess=sess)
-    agent.train_actor(state=obs_batch, sess=sess)
-    agent.train_critic(state=obs_batch, action=act_batch, target=target, sess=sess)
 
-    sess.run([agent_actor_target_update, agent_critic_target_update])
-
-def train_agent(agent_ddpg, agent_ddpg_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess, other_actors):
+def train_agent(agent, agent_target, agent_memory, agent_actor_target_update, agent_critic_target_update, sess, other_actors):
     total_obs_batch, total_act_batch, rew_batch, total_next_obs_batch, done_mask = agent_memory.sample(32)
 
     act_batch = total_act_batch[:, 0, :]
@@ -73,10 +65,9 @@ def train_agent(agent_ddpg, agent_ddpg_target, agent_memory, agent_actor_target_
     next_other_actor2_o = total_next_obs_batch[:, 2, :]
 
     next_other_action = np.hstack([other_actors[0].action(next_other_actor1_o, sess), other_actors[1].action(next_other_actor2_o, sess)])
-    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_ddpg_target.Q(state=next_obs_batch, action=agent_ddpg.action(next_obs_batch, sess),
-                                                                     other_action=next_other_action, sess=sess)
-    agent_ddpg.train_actor(state=obs_batch, other_action=other_act_batch, sess=sess)
-    agent_ddpg.train_critic(state=obs_batch, action=act_batch, other_action=other_act_batch, target=target, sess=sess)
+    target = rew_batch.reshape(-1, 1) + 0.9999 * agent_target.Q(state=next_obs_batch, action=agent.action(next_obs_batch, sess), other_action=next_other_action, sess=sess)
+    agent.train_actor(state=obs_batch, other_action=other_act_batch, sess=sess)
+    agent.train_critic(state=obs_batch, action=act_batch, other_action=other_act_batch, target=target, sess=sess)
 
     sess.run([agent_actor_target_update, agent_critic_target_update])
 
@@ -108,7 +99,7 @@ if __name__=="__main__":
                         shared_viewer=True)
     obs_n = env.reset()
     print("# of agent {}".format(env.n))
-    obs_shape_n = [np.array(env.observation_space[i].shape)[0] for i in range(env.n)]
+    obs_shape_n = [10,10,10]
     print("observation dim : {}".format(obs_shape_n))
     print("action dim : {}".format(action_size))
 
@@ -170,6 +161,14 @@ if __name__=="__main__":
         env.render()
         if roll_out % 1000 == 0:
             obs_n = env.reset()
+            # Simple Adversary 환경 특이한 부분 조절 ====
+            temp = np.zeros((10,))
+            for t in range(8):
+                temp[t] = obs_n[0][t]
+            obs_n[0] = temp
+            # 다른 환경은 무필요 ========================
+
+
 
         agent1_action, agent2_action, agent3_action = get_agents_action(obs_n, obs_shape_n, sess, noise_rate=0.2)
 
@@ -182,7 +181,11 @@ if __name__=="__main__":
         if train_mode == True and e > np.random.rand():
             for agent_index in range(env.n):
                 acs.append(np.random.randint(0,action_size))
-        print(acs)
+        else:
+            acs.append(np.argmax(agent1_action))
+            acs.append(np.argmax(agent2_action))
+            acs.append(np.argmax(agent3_action))
+
         acs_agent1[acs[0]] = 1
         acs_agent2[acs[1]] = 1
         acs_agent3[acs[2]] = 1
@@ -194,21 +197,38 @@ if __name__=="__main__":
         # good_agent # = 2,  adversary_agent # = 1
         o_n_next, r_n, d_n, i_n = env.step(acs_n)
 
-        agent1_memory.add(obs_n[0], agent1_action[0], r_n[0], o_n_next[0], d_n[0])
-        agent2_memory.add(obs_n[1], agent2_action[0], r_n[1], o_n_next[1], d_n[1])
-        agent3_memory.add(obs_n[2], agent3_action[0], r_n[2], o_n_next[2], d_n[2])
+        print("Rollout {} reward {}".format(roll_out, np.sum(r_n)))
+
+        # Simple Adversary 환경 특이한 부분 조절 ====
+        temp = np.zeros((10,))
+        for t in range(8):
+            temp[t] = o_n_next[0][t]
+        o_n_next[0] = temp
+        # 다른 환경은 무필요 ========================
+
+        agent1_memory.add(np.vstack([obs_n[0], obs_n[1], obs_n[2]]),
+                          np.vstack([acs_agent1, acs_agent2, acs_agent3]),
+                          r_n[0], np.vstack([o_n_next[0], o_n_next[1], o_n_next[2]]), d_n[0])
+
+        agent2_memory.add(np.vstack([obs_n[1], obs_n[2], obs_n[0]]),
+                          np.vstack([acs_agent2, acs_agent1, acs_agent3]),
+                          r_n[1], np.vstack([o_n_next[1], o_n_next[2], o_n_next[0]]), d_n[1])
+
+        agent3_memory.add(np.vstack([obs_n[2], obs_n[0], obs_n[1]]),
+                          np.vstack([acs_agent3, acs_agent1, acs_agent2]),
+                          r_n[2], np.vstack([o_n_next[2], o_n_next[0], o_n_next[1]]), d_n[2])
 
         if roll_out > 50000:
             e *= 0.9999
             # agent1 train
             train_agent(agent1_ddpg, agent1_ddpg_target, agent1_memory, agent1_actor_target_update,
-                        agent1_critic_target_update, sess)
+                        agent1_critic_target_update, sess, [agent2_ddpg_target, agent3_ddpg_target])
 
             train_agent(agent2_ddpg, agent2_ddpg_target, agent2_memory, agent2_actor_target_update,
-                        agent2_critic_target_update, sess)
+                        agent2_critic_target_update, sess, [agent3_ddpg_target, agent1_ddpg_target])
 
             train_agent(agent3_ddpg, agent3_ddpg_target, agent3_memory, agent3_actor_target_update,
-                        agent3_critic_target_update, sess)
+                        agent3_critic_target_update, sess, [agent1_ddpg_target, agent2_ddpg_target])
 
         # Agent Reward Tensorboard ===================================================================
         for agent_index in range(3):
