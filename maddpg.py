@@ -17,7 +17,7 @@ action_size = 5
 load_model = False
 train_mode = True
 
-batch_size = 32
+batch_size = 256
 mem_maxlen = 50000
 discount_factor = 0.99
 learning_rate = 0.00025
@@ -64,7 +64,7 @@ class Critic(object):
             self.mlp2 = layer.dense(inputs=self.concat, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
-            self.Q_Out = layer.dense(self.mlp4, units=1, activation=None)
+            self.Q_Out = layer.dense(self.mlp4, units=1, activation=tf.nn.relu)
         self.q_predict = self.Q_Out
         self.critic_optimizer = tf.train.AdamOptimizer(learning_rate)
 
@@ -84,7 +84,7 @@ class Actor(object):
             self.mlp2 = layer.dense(inputs=self.mlp1, units=64, activation = tf.nn.relu)
             self.mlp3 = layer.dense(inputs=self.mlp2, units=64, activation = tf.nn.relu)
             self.mlp4 = layer.dense(inputs=self.mlp3, units=64, activation = tf.nn.relu)
-            self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=tf.nn.tanh)
+            self.Pi_Out = layer.dense(self.mlp4,  units=self.action_size, activation=None)
         self.pi_predict = self.Pi_Out
         self.actor_optimizer = tf.train.AdamOptimizer(learning_rate)
 
@@ -122,21 +122,24 @@ class MADDPGAgent(object):
         self.action_input = tf.placeholder(shape=[None, self.action_size], dtype=tf.float32)
         self.other_actions = tf.placeholder(shape=[None, self.action_size * (self.agent_num-1)], dtype=tf.float32)
         self.target_Q = tf.placeholder(shape=[None,1],dtype=tf.float32)
-        self.reward = tf.placeholder(shape=[None, 1], dtype=tf.float32)
+        self.reward = tf.placeholder(shape=[None,1], dtype=tf.float32)
         # ========================================================================================
 
         self.actor = Actor(self.state_size, self.action_size, self.input, "Pimodel_" + idx)
         self.critic = Critic(self.state_size, self.action_size, self.input, self.action_input, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=False)
 
-        self.critic_grads = Critic(self.state_size, self.action_size, self.input, self.actor.pi_predict, self.other_actions, "Qmodel_" + idx, self.agent_num, reuse=True)
-        self.actor_loss = -tf.reduce_mean(self.critic_grads.q_predict)
-        self.actor_train = self.actor.actor_optimizer.minimize(self.actor_loss)
+        actor_var = [i for i in tf.trainable_variables() if ("Pimodel_" + idx) in i.name]
+        self.action_gradients = tf.gradients(self.critic.q_predict, self.action_input)[0]
+        self.actor_gradients = tf.gradients(self.actor.pi_predict, actor_var, -self.action_gradients)
+        self.grads_and_vars = list(zip(self.actor_gradients, actor_var))
+        self.actor_train = self.actor.actor_optimizer.apply_gradients(self.grads_and_vars)
 
         self.critic_loss = tf.reduce_mean(tf.square(self.target_Q - self.critic.q_predict))
         self.critic_train = self.critic.critic_optimizer.minimize(self.critic_loss)
 
-    def train_actor(self, state, other_action, sess):
-        sess.run(self.actor_train, {self.input: state, self.other_actions: other_action})
+    def train_actor(self, state, action, other_action, sess):
+        sess.run(self.actor_train,
+                 {self.input: state, self.action_input: action, self.other_actions: other_action})
 
     def train_critic(self, state, action, other_action, target, sess):
         sess.run(self.critic_train,

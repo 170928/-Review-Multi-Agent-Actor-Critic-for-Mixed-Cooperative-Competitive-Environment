@@ -35,3 +35,6 @@ class ReplayBuffer(object):
     def sample(self, batch_size):
         idxes = [random.randint(0, len(self._storage) - 1) for _ in range(batch_size)]
         return self._encode_sample(idxes)
+
+    def size(self):
+        return len(self._storage)
