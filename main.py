@@ -15,7 +15,7 @@ from noise import OU
 ########################################
 action_size = 5
 
-load_model = True
+load_model = False
 train_mode = True
 
 batch_size = 256
